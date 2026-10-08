@@ -307,18 +307,28 @@ class CharmmGuiAuto:
 
         Parameters:
             pH (float): The desired pH value (optional).
+
+        CHARMM-GUI hides the whole pH option when its PROPKA run gave no result for the job
+        (the page's `pka` variable is 'N/W'); default protonation states then apply. Whether
+        that happens can differ between submissions of the same structure. The outcome is kept
+        in self.ph_status ('set', 'off' or 'unavailable') so callers can record it.
         """
+        box = self.driver.find_element(By.ID, 'ph_option')
+        if not box.is_displayed():
+            self.ph_status = 'unavailable'
+            print("pH option hidden by CHARMM-GUI (no PROPKA result); default protonation states apply")
+            return
         if pH is None:
-            ### One of my systems crash for seemingly no good reason when running "self.driver.find_element(By.ID, 'ph_checked').click()". Added try-except to fix the crash.
-            try:
+            if self.driver.find_element(By.ID, 'ph_checked').is_selected():
                 self.driver.find_element(By.ID, 'ph_checked').click()
-            except:
-                print("Failed to find the 'ph' button")
+            self.ph_status = 'off'
         else:
             t = self.driver.find_element(By.ID, 'system_pH')
             t.clear()
-            t.send_keys(pH)
-            self.driver.find_element(By.XPATH, '/html/body/div[4]/div[2]/div[3]/div[3]/form/div[1]/input[3]').click()
+            t.send_keys(str(pH))
+            box.find_element(By.XPATH, './/input[@value="Apply"]').click()
+            self.ph_status = 'set'
+            print(f"pH set to {pH}")
 
     def add_protonation(self, chain, res_i, rid, res_p):
         """
