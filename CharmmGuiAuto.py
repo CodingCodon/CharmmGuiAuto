@@ -396,11 +396,41 @@ class CharmmGuiAuto:
                 self.driver.find_element(By.XPATH, '//*[@id="id_phos_table"]/tr[2]/td[5]/input').click()
             self.driver.find_element(By.XPATH, '//input[@value="Add Phosphorylation"]').click()
             resids = [i.get_attribute('id') for i in self.driver.find_elements(By.XPATH, '//select[starts-with(@id,"phos_chain_")]') if i.is_displayed()]
-            resid = resids[-1][-1]
+            resid = resids[-1].split('_')[-1]  # row index; [-1][-1] broke from the 10th row on
             Select(self.driver.find_element(By.ID, f'phos_chain_{resid}')).select_by_value(chain)
             Select(self.driver.find_element(By.ID, f'phos_res_{resid}')).select_by_value(res_i)
             Select(self.driver.find_element(By.ID, f'phos_rid_{resid}')).select_by_value(rid)
             Select(self.driver.find_element(By.ID, f'phos_patch_{resid}')).select_by_value(res_p)
+
+    def add_ptm(self, chain, res_i, rid, res_p):
+        """
+        Adds a Lys / Arg post-translational modification ("Lys / Arg PTMs" table).
+
+        These patches are not in the phosphorylation table. For LYS the dropdown offers e.g.
+        KAC (acetyl), KSUC (succinyl) and the methylations; check the 'Patch' dropdown in the
+        GUI for the full list.
+
+        Parameters:
+            chain (str): Chain identifier, e.g. PROA.
+            res_i (str): Residue name, LYS or ARG.
+            rid (str): Residue ID.
+            res_p (str): Patch name as in the dropdown, e.g. KAC.
+        """
+        if chain is None:
+            return
+        d = self.driver
+        # The table opens with one blank row: the first PTM fills it, later ones add a row
+        # with the section's own button (other sections have "Add Modification" buttons too).
+        if not d.find_element(By.ID, 'id_ptm').is_displayed():
+            d.find_element(By.ID, 'ptm_checked').click()
+        else:
+            d.find_element(By.ID, 'ptm_option').find_element(By.XPATH, './/input[@value="Add Modification"]').click()
+        rows = [i.get_attribute('id') for i in d.find_elements(By.XPATH, '//select[starts-with(@id,"ptm_chain_")]') if i.is_displayed()]
+        idx = rows[-1].split('_')[-1]
+        Select(d.find_element(By.ID, f'ptm_chain_{idx}')).select_by_value(chain)
+        Select(d.find_element(By.ID, f'ptm_res_{idx}')).select_by_value(res_i)
+        Select(d.find_element(By.ID, f'ptm_rid_{idx}')).select_by_value(rid)
+        Select(d.find_element(By.ID, f'ptm_patch_{idx}')).select_by_value(res_p)
 
     def sugar_options(self, sugar_id=1, link=None, ltype='B', sname='GLC'):
         """
@@ -752,7 +782,7 @@ class CharmmGuiAuto:
         os.system(f'rm -r {out_tmp}')
         print('Unpacked')
 
-    def manipulate_PDB(self, path=None, file_name=None, pdb_id=None, model=None, chains=None, hets=None, pH=None, preserve={'option': None}, mutations=None, protonations=None, disulfides=None, phosphorylations=None, gpi={'GRS': None}, glycans=None):
+    def manipulate_PDB(self, path=None, file_name=None, pdb_id=None, model=None, chains=None, hets=None, pH=None, preserve={'option': None}, mutations=None, protonations=None, disulfides=None, phosphorylations=None, gpi={'GRS': None}, glycans=None, ptms=None):
         """
         Manipulates a PDB file with various options.
 
@@ -813,6 +843,9 @@ class CharmmGuiAuto:
         if phosphorylations is not None:
             for phosphorylation in phosphorylations:
                 self.add_phosphorylation(**phosphorylation)
+        if ptms is not None:
+            for ptm in ptms:
+                self.add_ptm(**ptm)
         self.add_gpi(**gpi, skip=6)
         if glycans is not None:
             for glycan in glycans:
@@ -867,7 +900,7 @@ class Retrieve(CharmmGuiAuto):
             raise ValueError('A very specific bad thing happened.')
 
 class PDBReader(CharmmGuiAuto):
-    def run(self, email, password, path=None, screenshot=False, file_name=None, download_now=True, pdb_id=None, model=None, chains=None, hets=None, pH=None, preserve={'option': None}, mutations=None, protonations=None, disulfides=None, phosphorylations=None, gpi={'GRS': None}, glycans=None):
+    def run(self, email, password, path=None, screenshot=False, file_name=None, download_now=True, pdb_id=None, model=None, chains=None, hets=None, pH=None, preserve={'option': None}, mutations=None, protonations=None, disulfides=None, phosphorylations=None, gpi={'GRS': None}, glycans=None, ptms=None):
         """
         Runs the PDB Reader and manipulates a PDB file.
 
@@ -899,7 +932,7 @@ class PDBReader(CharmmGuiAuto):
             else:
                 self.from_pdb(pdb_id)
             time.sleep(1)
-            jobid = self.manipulate_PDB(path, file_name, pdb_id, model, chains, hets, pH, preserve, mutations, protonations, disulfides, phosphorylations, gpi, glycans)
+            jobid = self.manipulate_PDB(path, file_name, pdb_id, model, chains, hets, pH, preserve, mutations, protonations, disulfides, phosphorylations, gpi, glycans, ptms=ptms)
             self.nxt(prev_step="PDB Manipulation", screen=screenshot, jobid=jobid)
             self.wait_text('Computed Energy')
             if download_now:
@@ -981,7 +1014,7 @@ class FFConverter(CharmmGuiAuto):
             raise ValueError('A very specific bad thing happened.')
 
 class PDBReaderFFConverter(CharmmGuiAuto):
-    def run(self, email, password, path=None, screenshot=False, file_name=None, download_now=True, pdb_id=None, model=None, hets=None, chains=None, het=None, pH=None, preserve={'option': None}, mutations=None, protonations=None, disulfides=None, phosphorylations=None, gpi={'GRS': None}, glycans=None, PBC=False, PBC_x=10, systype='Solution', ff='c36m', amber_options = None, engine='gmx', temp=310):
+    def run(self, email, password, path=None, screenshot=False, file_name=None, download_now=True, pdb_id=None, model=None, hets=None, chains=None, het=None, pH=None, preserve={'option': None}, mutations=None, protonations=None, disulfides=None, phosphorylations=None, gpi={'GRS': None}, glycans=None, ptms=None, PBC=False, PBC_x=10, systype='Solution', ff='c36m', amber_options = None, engine='gmx', temp=310):
         """
         Runs both the PDB Reader and Force Field Converter.
 
@@ -1019,7 +1052,7 @@ class PDBReaderFFConverter(CharmmGuiAuto):
                 self.upload(file_name, path)
             else:
                 self.from_pdb(pdb_id)
-            jobid1 = self.manipulate_PDB(path, file_name, pdb_id, model, chains, het, pH, preserve, mutations, protonations, disulfides, phosphorylations, gpi, glycans)
+            jobid1 = self.manipulate_PDB(path, file_name, pdb_id, model, chains, het, pH, preserve, mutations, protonations, disulfides, phosphorylations, gpi, glycans, ptms=ptms)
             self.nxt(prev_step="PDB Manipulation", screen=screenshot, jobid=jobid1)
             self.wait_text('Computed Energy')
             print(f'Ready to download from retrieve job id {jobid1}')
@@ -1073,7 +1106,7 @@ class PDBReaderFFConverter(CharmmGuiAuto):
             raise ValueError('A very specific bad thing happened.')
 
 class SolutionProtein(CharmmGuiAuto):
-    def run(self, email, password, path=None, file_name=None, screenshot=False, download_now=True, pdb_id=None, model=None, chains=None, hets=None, pH=None, preserve={'option': None}, mutations=None, protonations=None, disulfides=None, phosphorylations=None, gpi={'GRS': None}, glycans=None, ions='NaCl', ff='c36m', amber_options = None, engine='gmx', temp='310', waterbox={'dis': 10.0}, ion_method=None):
+    def run(self, email, password, path=None, file_name=None, screenshot=False, download_now=True, pdb_id=None, model=None, chains=None, hets=None, pH=None, preserve={'option': None}, mutations=None, protonations=None, disulfides=None, phosphorylations=None, gpi={'GRS': None}, glycans=None, ptms=None, ions='NaCl', ff='c36m', amber_options = None, engine='gmx', temp='310', waterbox={'dis': 10.0}, ion_method=None):
         """
         Runs the Solution Protein setup and simulation.
 
@@ -1117,7 +1150,7 @@ class SolutionProtein(CharmmGuiAuto):
             # self.model_select(model)
             # self.nxt()
             # self.wait_text("PDB Manipulation Options")
-            jobid = self.manipulate_PDB(path, file_name, pdb_id, model, chains, hets, pH, preserve, mutations, protonations, disulfides, phosphorylations, gpi, glycans)
+            jobid = self.manipulate_PDB(path, file_name, pdb_id, model, chains, hets, pH, preserve, mutations, protonations, disulfides, phosphorylations, gpi, glycans, ptms=ptms)
 
             # if chains is not None:
             #     for chain in chains:
@@ -1501,7 +1534,7 @@ class MembraneProtein(CharmmGuiAuto):
         time.sleep(2)
 
 
-    def run(self, email, password, path=None, file_name=None, screenshot=False, download_now=True, pdb_id=None, model=None, chains=None, hets=None, pH=None, preserve={'option': None}, mutations=None, protonations=None, disulfides=None, phosphorylations=None, gpi={'GRS': None}, glycans=None, orientation={'option':'PDB'}, position={'option': None}, area={'option': None}, projection={'option': None}, boxtype={'option': None}, lengthZ={'option': None}, lengthXY={'option': 'ratio', 'value': 100}, lipids=None, naas=None, pegs=None, glycolipids=None, size=100, ions='NaCl', ff='c36m', amber_options = None, engine='gmx', temp='310'):
+    def run(self, email, password, path=None, file_name=None, screenshot=False, download_now=True, pdb_id=None, model=None, chains=None, hets=None, pH=None, preserve={'option': None}, mutations=None, protonations=None, disulfides=None, phosphorylations=None, gpi={'GRS': None}, glycans=None, ptms=None, orientation={'option':'PDB'}, position={'option': None}, area={'option': None}, projection={'option': None}, boxtype={'option': None}, lengthZ={'option': None}, lengthXY={'option': 'ratio', 'value': 100}, lipids=None, naas=None, pegs=None, glycolipids=None, size=100, ions='NaCl', ff='c36m', amber_options = None, engine='gmx', temp='310'):
         """
         Runs the membrane protein setup and simulation.
 
@@ -1555,7 +1588,7 @@ class MembraneProtein(CharmmGuiAuto):
             # self.model_select(model)
             # self.nxt()
             # self.wait_text("PDB Manipulation Options")
-            jobid = self.manipulate_PDB(path, file_name, pdb_id, model, chains, hets, pH, preserve, mutations, protonations, disulfides, phosphorylations, gpi, glycans)
+            jobid = self.manipulate_PDB(path, file_name, pdb_id, model, chains, hets, pH, preserve, mutations, protonations, disulfides, phosphorylations, gpi, glycans, ptms=ptms)
 
             # if chains is not None:
             #     for chain in chains:
