@@ -8,6 +8,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.firefox.service import Service
+import shutil
 import time
 import os
 import copy
@@ -20,14 +22,18 @@ import traceback
 import subprocess
 
 class CharmmGuiAuto:
-    def __init__(self, system, headless=True, path_out=None):
+    def __init__(self, system, headless=True, path_out=None, geckodriver=None):
         """
         Initializes the CharmmGuiAuto class.
 
         Parameters:
             headless (bool): Whether to run the browser in headless mode.
             system (str): Type of system to set up ('membrane', 'solution', 'retrieve', 'reader', 'readerconverter', 'converter').
-            path_out (str): Path to the output directory.
+            path_out (str): Path to the output directory (a trailing '/' is optional).
+            geckodriver (str): Path to the geckodriver binary (optional). Falls back to the
+                CHARMMGUIAUTO_GECKODRIVER environment variable, then geckodriver on PATH, then
+                /snap/bin/geckodriver. Needed where Selenium Manager cannot resolve the driver
+                itself, e.g. Ubuntu's snap-packaged Firefox.
         """
         global out_tmp
 
@@ -39,6 +45,7 @@ class CharmmGuiAuto:
 
         if path_out is not None:
             letters = string.ascii_letters
+            path_out = os.path.join(path_out, '')
             self.path_out = path_out
             out_tmp = f'{path_out}{"".join(random.choice(letters) for i in range(10))}'
             print(out_tmp)
@@ -52,17 +59,23 @@ class CharmmGuiAuto:
         #options.headless = True
         if headless is True:
             options.add_argument("--headless")
-        self.driver = webdriver.Firefox(options=options)
+        driver_path = (geckodriver or os.environ.get('CHARMMGUIAUTO_GECKODRIVER')
+                       or shutil.which('geckodriver')
+                       or ('/snap/bin/geckodriver' if os.path.exists('/snap/bin/geckodriver') else None))
+        if driver_path:
+            self.driver = webdriver.Firefox(options=options, service=Service(driver_path))
+        else:
+            self.driver = webdriver.Firefox(options=options)
         if system == 'membrane':
-            self.driver.get('https://www.charmm-gui.org/?doc=input/membrane.bilayer')
+            self.driver.get('https://charmm-gui.org/?doc=input/membrane.bilayer')
         elif system == 'solution':
             self.driver.get('https://charmm-gui.org/?doc=input/solution')
         elif system == 'retrieve':
-            self.driver.get('https://www.charmm-gui.org/?doc=input/retriever')
+            self.driver.get('https://charmm-gui.org/?doc=input/retriever')
         elif system in ['reader', 'readerconverter']:
-            self.driver.get('https://www.charmm-gui.org/?doc=input/pdbreader')
+            self.driver.get('https://charmm-gui.org/?doc=input/pdbreader')
         elif system == 'converter':
-            self.driver.get('https://www.charmm-gui.org/?doc=input/converter.ffconverter')
+            self.driver.get('https://charmm-gui.org/?doc=input/converter.ffconverter')
 
     def take_full_page_screenshot(self, file_path, jobid):
             os.system(f'mkdir -p {self.path_out}/Screenshots/')
@@ -815,10 +828,10 @@ class Retrieve(CharmmGuiAuto):
             self.driver.find_element(By.XPATH, '/html/body/div[4]/div[2]/div[3]/form/input[2]').click()
             self.wait_text("Job found")
             if 'membrane.bilayer' in self.driver.page_source:
-                self.driver.get(f'https://www.charmm-gui.org/?doc=input/membrane.bilayer&step=6&project=membrane_bilayer&jobid={jobid}')
+                self.driver.get(f'https://charmm-gui.org/?doc=input/membrane.bilayer&step=6&project=membrane_bilayer&jobid={jobid}')
                 self.driver.find_element(By.XPATH, '/html/body/div[4]/div[2]/div[3]/div[2]/div[8]/a').click()
             else:
-                self.driver.get(f'https://www.charmm-gui.org/?doc=input/solution&step=4&project=solution&jobid={jobid}')
+                self.driver.get(f'https://charmm-gui.org/?doc=input/solution&step=4&project=solution&jobid={jobid}')
                 self.driver.find_element(By.XPATH, '/html/body/div[4]/div[2]/div[3]/div[2]/div[6]/a').click()
 
             while not os.path.isfile(f'{out_tmp}/charmm-gui.tgz'):
@@ -1004,7 +1017,7 @@ class PDBReaderFFConverter(CharmmGuiAuto):
             print(f'PDBReader done - output under \"{self.path_out}charmm-gui-{jobid1.split(" ")[-1]}\"')
             path_PDBReader = f'{self.path_out}charmm-gui-{jobid1.split(" ")[-1]}'
             #PDBReader done moving on to FFConverter
-            self.driver.get('https://www.charmm-gui.org/?doc=input/converter.ffconverter')
+            self.driver.get('https://charmm-gui.org/?doc=input/converter.ffconverter')
             self.wait_text('Force Field Converter')
             time.sleep(1)
             # Upload PSF File
