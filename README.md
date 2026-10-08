@@ -19,12 +19,16 @@ The fixes below were needed to run Solution Builder against CHARMM-GUI and curre
 | pH option hidden | CHARMM-GUI hides the pH box when its PROPKA run gives no result for the job (this can differ between submissions of the same structure). Setting a pH then crashed. It is now skipped with a message, and `self.ph_status` records `set`, `off` or `unavailable`. |
 | Explicit water box (`waterbox: {size: explicit, ...}`) | Failed with "Invalid system volume": the form was clicked before the page finished loading, so the size fields were never created. The page is now waited for, the fields are cleared before typing, and the values are read back. |
 | Error messages | Every failure printed only "A very specific bad thing happened."; the traceback is now printed first. |
+| Next button | Clicked while the page was still redrawing after a pH change, so jobs with nothing else to set failed with "Unable to locate element: nextBtn". Now waits until the button can be clicked. |
+| pH field not ready | The pH box could be visible before its field accepted input ("could not be scrolled into view"). Now waits for the page and the field; as a last resort it sets the value through the page's own `change_pH()`, then reads it back. |
+| Endless waits | If a step died on the server, the browser waited forever (one job sat about 4 h; the Job Retriever showed it never passed solution step 3). `wait_text` now raises `TimeoutError` after `max_wait_min` minutes (default 60; set it in `system_info`). |
 
 New YAML keys, by example ([`Example_input_yaml/SolutionProteinPTM.yaml`](Example_input_yaml/SolutionProteinPTM.yaml)):
 
 ```yaml
 system_info:
   geckodriver: /snap/bin/geckodriver   # optional
+  max_wait_min: 60                     # optional; give up on a stuck step
 details:
   pH: 6.8
   ptms:                                # Lys / Arg PTMs
