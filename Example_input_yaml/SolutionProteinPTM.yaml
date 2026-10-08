@@ -1,0 +1,39 @@
+system_type:
+  system_type: SP # protein in solution
+system_info:
+  headless: true
+  path_out: ## INSERT OUTPUT PATH ## (trailing / optional)
+  # geckodriver: /snap/bin/geckodriver # optional; needed for Ubuntu's snap Firefox if not found automatically
+details:
+  pdb_id: 1L58 # T4 lysozyme; or use path + file_name for a local PDB
+  chains:
+  - - PROA
+    - first
+    - ACE # acetylated N-terminus (use ACP when residue 1 is Pro)
+  - - PROA
+    - last
+    - CT2 # amidated C-terminus (-CONH2)
+  pH: 6.8 # skipped with a message if CHARMM-GUI hides the pH option (no PROPKA result)
+  ptms: # Lys / Arg PTMs; values as in the GUI's 'Patch' dropdown
+    - # acetylate LYS16
+      chain: PROA
+      res_i: LYS
+      rid: '16'
+      res_p: KAC
+    - # acetylate LYS19
+      chain: PROA
+      res_i: LYS
+      rid: '19'
+      res_p: KAC
+  waterbox: # explicit cubic box with 95 A edges (instead of fitting by edge distance)
+    size: explicit
+    shape: rect
+    X: 95
+    Y: 95
+    Z: 95
+  ions: NaCl # 0.15 M default
+  email: ## INSERT YOUR EMAIL FOR CHARMM-GUI HERE ##
+  password: ## INSERT YOUR PASSWORD FOR CHARMM-GUI HERE ##
+  ff: c36m
+  engine: gmx
+  temp: 310
