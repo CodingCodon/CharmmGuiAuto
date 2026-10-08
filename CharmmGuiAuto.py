@@ -915,7 +915,8 @@ class Retrieve(CharmmGuiAuto):
             self.driver.quit()
             print(f'Job done - output under \"{self.path_out}/charmm-gui-{jobid}\"')
         except:
-            print('Exception raised')
+            print('Exception raised:')
+            traceback.print_exc()
             self.driver.quit()
             raise ValueError('A very specific bad thing happened.')
 
@@ -964,7 +965,8 @@ class PDBReader(CharmmGuiAuto):
                 self.driver.quit()
                 print(f'Job done, but has not been retrieved JOBID: {jobid.split(" ")[-1]}')
         except:
-            print('Exception raised')
+            print('Exception raised:')
+            traceback.print_exc()
             self.driver.quit()
             raise ValueError('A very specific bad thing happened.')
 
@@ -1029,7 +1031,8 @@ class FFConverter(CharmmGuiAuto):
                 self.driver.quit()
                 print(f'Job done, but has not been retrieved JOBID: {jobid.split(" ")[-1]}')
         except:
-            print('Exception raised')
+            print('Exception raised:')
+            traceback.print_exc()
             self.driver.quit()
             raise ValueError('A very specific bad thing happened.')
 
@@ -1121,7 +1124,8 @@ class PDBReaderFFConverter(CharmmGuiAuto):
                 self.driver.quit()
                 print(f'Job done, but has not been retrieved JOBID: {jobid.split(" ")[-1]}')
         except:
-            print('Exception raised')
+            print('Exception raised:')
+            traceback.print_exc()
             self.driver.quit()
             raise ValueError('A very specific bad thing happened.')
 
@@ -1220,7 +1224,8 @@ class SolutionProtein(CharmmGuiAuto):
                 self.driver.quit()
                 print(f'Job done, but has not been retrieved JOBID: {jobid.split(" ")[-1]}')
         except:
-            print('Exception raised')
+            print('Exception raised:')
+            traceback.print_exc()
             self.driver.quit()
             raise ValueError('A very specific bad thing happened.')
 
@@ -1699,7 +1704,8 @@ class MembraneProtein(CharmmGuiAuto):
                 print(f'Job done, but has not been retrieved - JOBID: {jobid.split(" ")[-1]}')
         except:
             traceback.print_exc()
-            print('Exception raised')
+            print('Exception raised:')
+            traceback.print_exc()
             self.driver.quit()
 
 class Membrane(MembraneProtein):
@@ -1792,7 +1798,8 @@ class Membrane(MembraneProtein):
                 print(f'Job done, but has not been retrieved - JOBID: {jobid.split(" ")[-1]}')
         except:
             traceback.print_exc()
-            print('Exception raised')
+            print('Exception raised:')
+            traceback.print_exc()
             self.driver.quit()
 
 def main(system_type):
