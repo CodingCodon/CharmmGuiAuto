@@ -23,7 +23,7 @@ import traceback
 import subprocess
 
 class CharmmGuiAuto:
-    def __init__(self, system, headless=True, path_out=None, geckodriver=None):
+    def __init__(self, system, headless=True, path_out=None, geckodriver=None, max_wait_min=60):
         """
         Initializes the CharmmGuiAuto class.
 
@@ -35,6 +35,9 @@ class CharmmGuiAuto:
                 CHARMMGUIAUTO_GECKODRIVER environment variable, then geckodriver on PATH, then
                 /snap/bin/geckodriver. Needed where Selenium Manager cannot resolve the driver
                 itself, e.g. Ubuntu's snap-packaged Firefox.
+            max_wait_min (float): Give up waiting for any one page after this many minutes
+                (default 60) and raise TimeoutError. Before, a step that died on the server
+                kept the browser waiting forever.
         """
         global out_tmp
 
@@ -42,6 +45,7 @@ class CharmmGuiAuto:
 
         self.screenshot_nr = 0
         self.ph_status = None
+        self.max_wait_min = max_wait_min
 
         options = webdriver.FirefoxOptions();
 
@@ -174,6 +178,8 @@ class CharmmGuiAuto:
                 start_time = time.time()
             else:
                 print(f'Still waiting for: {text} (time elapsed {(time.time() - start_time)/60:.2f} minutes)')
+                if time.time() - start_time > self.max_wait_min * 60:
+                    raise TimeoutError(f'gave up waiting for "{text}" after {self.max_wait_min} min')
             try:
                 wait = WebDriverWait(self.driver, 300)
                 element = wait.until(EC.text_to_be_present_in_element((By.ID, "body"), text))
@@ -188,6 +194,9 @@ class CharmmGuiAuto:
                     self.driver.quit()
                 except:
                     self.wait_text(text, start_time=start_time)
+        except TimeoutError:
+            self.driver.quit()
+            raise
         except:
             print('window has been closed')
             self.driver.quit()
