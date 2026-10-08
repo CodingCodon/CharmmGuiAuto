@@ -97,7 +97,8 @@ class CharmmGuiAuto:
         if screen:
             self.take_full_page_screenshot(file_path=f"{prev_step.replace(' ', '_')}.png", jobid=jobid)
 
-        self.driver.find_element(By.ID, 'nextBtn').click()
+        # The button is briefly absent while the page redraws (e.g. right after applying a pH)
+        WebDriverWait(self.driver, 120, 1).until(EC.element_to_be_clickable((By.ID, 'nextBtn'))).click()
 
     def close_donation_popup(self):
         """
