@@ -316,22 +316,32 @@ class CharmmGuiAuto:
         that happens can differ between submissions of the same structure. The outcome is kept
         in self.ph_status ('set', 'off' or 'unavailable') so callers can record it.
         """
-        box = self.driver.find_element(By.ID, 'ph_option')
+        d = self.driver
+        # The page's scripts decide whether to show the box only once it has loaded
+        WebDriverWait(d, 120, 1).until(lambda dr: dr.execute_script("return document.readyState") == "complete")
+        time.sleep(2)
+        box = d.find_element(By.ID, 'ph_option')
         if not box.is_displayed():
             self.ph_status = 'unavailable'
             print("pH option hidden by CHARMM-GUI (no PROPKA result); default protonation states apply")
             return
         if pH is None:
-            if self.driver.find_element(By.ID, 'ph_checked').is_selected():
-                self.driver.find_element(By.ID, 'ph_checked').click()
+            if d.find_element(By.ID, 'ph_checked').is_selected():
+                d.find_element(By.ID, 'ph_checked').click()
             self.ph_status = 'off'
-        else:
-            t = self.driver.find_element(By.ID, 'system_pH')
+            return
+        try:
+            t = WebDriverWait(d, 30, 1).until(EC.element_to_be_clickable((By.ID, 'system_pH')))
             t.clear()
             t.send_keys(str(pH))
             box.find_element(By.XPATH, './/input[@value="Apply"]').click()
-            self.ph_status = 'set'
-            print(f"pH set to {pH}")
+        except Exception:
+            # field still not interactable: set it the way the page's own Apply button does
+            d.execute_script("document.getElementById('system_pH').value = arguments[0]; change_pH();", str(pH))
+        if d.find_element(By.ID, 'system_pH').get_attribute('value') != str(pH):
+            raise ValueError(f"pH field reads {d.find_element(By.ID, 'system_pH').get_attribute('value')!r}")
+        self.ph_status = 'set'
+        print(f"pH set to {pH}")
 
     def add_protonation(self, chain, res_i, rid, res_p):
         """
