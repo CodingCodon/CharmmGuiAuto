@@ -9,6 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.common.keys import Keys
 import shutil
 import time
 import os
@@ -40,6 +41,7 @@ class CharmmGuiAuto:
         print(headless)
 
         self.screenshot_nr = 0
+        self.ph_status = None
 
         options = webdriver.FirefoxOptions();
 
@@ -635,19 +637,37 @@ class CharmmGuiAuto:
             X (float): X dimension for explicit size (default is 10.0).
             Y (float): Y dimension for explicit size (default is 10.0).
             Z (float): Z dimension for explicit size (default is 10.0).
+
+        The "Add Ions" heading appears before the page has finished loading, and the box-size
+        fields are built from templates (rect_skel / octa_skel) at the end of the page, so
+        wait for those first. Clicking "Specify Waterbox Size" can raise an "Invalid system
+        volume" alert while the fields are still empty; it is dismissed and the fields are
+        built explicitly. Values are cleared before typing and read back.
         """
+        d = self.driver
+        WebDriverWait(d, 300, 2).until(lambda dr: dr.execute_script("return document.readyState") == "complete"
+                                       and dr.find_elements(By.ID, f'{shape}_skel'))
         if size == 'explicit':
-            self.driver.find_element(By.XPATH, '//*[@id="fsolution"]/div[1]/table/tbody/tr[1]/td[1]/input').click()
-            if shape == 'rect':
-                Select(self.driver.find_element(By.NAME, 'solvtype')).select_by_value('rect')
-                self.driver.find_element(By.XPATH, '//*[@id="box[rect][x]"]').send_keys(X)
-                self.driver.find_element(By.XPATH, '//*[@id="box[rect][y]"]').send_keys(Y)
-                self.driver.find_element(By.XPATH, '//*[@id="box[rect][z]"]').send_keys(Z)
-            else:
-                Select(self.driver.find_element(By.NAME, 'solvtype')).select_by_value('octa')
-                self.driver.find_element(By.XPATH, '//*[@id="box[octa][x]"]').send_keys(X)
+            d.find_element(By.XPATH, '//input[@name="solvate_option" and @value="explicit"]').click()
+            try:
+                alert = d.switch_to.alert
+                print(f'Dismissed alert: {alert.text}')
+                alert.accept()
+            except Exception:
+                pass
+            Select(d.find_element(By.NAME, 'solvtype')).select_by_value(shape)
+            if not d.find_elements(By.ID, f'box[{shape}][x]'):
+                d.execute_script("changeOption('boxoption', arguments[0])", shape)
+            want = {'x': X, 'y': Y, 'z': Z} if shape == 'rect' else {'x': X}
+            for ax, v in want.items():
+                field = d.find_element(By.ID, f'box[{shape}][{ax}]')
+                field.clear()
+                field.send_keys(str(v))
+                field.send_keys(Keys.TAB)
+                if field.get_attribute('value') != str(v):
+                    raise ValueError(f"box[{shape}][{ax}] reads {field.get_attribute('value')!r}, wanted {v}")
         else:
-            self.driver.find_element(By.XPATH, '//*[@id="fsolution"]/div[1]/table/tbody/tr[2]/td[1]/input').click()
+            d.find_element(By.XPATH, '//input[@name="solvate_option" and @value="implicit"]').click()
             if shape == 'rect':
                 Select(self.driver.find_element(By.NAME, 'solvtype')).select_by_value('rect')
             else:
